@@ -7,4 +7,6 @@ Integrantes:
 4.David Alberto Valles Gómez VG240553
 5.Herbert William Solano Vásquez SV202844
 
-Enlace Trello: https://trello.com/b/cGa7lzMC/mi-tablero-de-trello
+<img width="738" height="1600" alt="image" src="https://github.com/user-attachments/assets/b4ff29f4-c7c6-417f-b1ff-62005ee795a7" />
+
+
