@@ -1,0 +1,29 @@
+<resources>
+    <string name="app_name">Event.ly</string>
+    <string name="no_data">Not Signed In</string>
+    <string name="sign_in">Iniciar Sesión</string>
+    <string name="sign_out">Cerrar Sesión</string>
+    <string name="register">Registrarse</string>
+    <string name="login">Iniciar Sesión</string>
+
+    <string name="dont_have_account">¿No tienes cuenta?</string>
+    <string name="already_have_account">¿Ya tienes cuenta?</string>
+    <string name="email">Correo Electrónico</string>
+    <string name="password">Contraseña</string>
+    <string name="create_account">Crear Cuenta</string>
+    
+    <!-- Strings de la aplicación de gastos -->
+    <string name="add_expense">Registrar Gasto</string>
+    <string name="view_expenses">Manejo de Gastos</string>
+    <string name="monthly_summary">Resumen Mensual</string>
+    <string name="expense_name">Nombre del Gasto</string>
+    <string name="amount">Monto</string>
+    <string name="category">Categoría</string>
+    <string name="date">Fecha</string>
+    <string name="total">Total</string>
+    
+    <!-- Clave para Google Sign-In -->
+    <string name="default_web_client_id">
+        363781663770-ecktij3d6nqf84t3deeouib785u06np0.apps.googleusercontent.com
+    </string>
+</resources>

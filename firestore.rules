@@ -1,0 +1,127 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function para obtener el rol del usuario
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    
+    function isOrganizer() {
+      return request.auth != null && getUserRole() == 'organizador';
+    }
+    
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+    
+    // ========== REGLAS PARA USUARIOS ==========
+    match /users/{userId} {
+      // Permitir lectura y escritura solo al propio usuario
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // Permitir lectura de otros usuarios (para mostrar nombres en comentarios)
+      allow read: if request.auth != null;
+    }
+    
+    // ========== REGLAS PARA EVENTOS ==========
+    match /events/{eventId} {
+      // Cualquier usuario autenticado puede leer eventos
+      allow read: if request.auth != null;
+      
+      // Solo organizadores pueden crear eventos
+      allow create: if request.auth != null && 
+                      isOrganizer() &&
+                      request.resource.data.organizerId == request.auth.uid;
+      
+      // Solo el organizador que creó el evento puede actualizarlo
+      allow update: if request.auth != null && 
+                      resource.data.organizerId == request.auth.uid &&
+                      request.resource.data.organizerId == request.auth.uid;
+      
+      // Solo el organizador que creó el evento puede eliminarlo
+      allow delete: if request.auth != null && 
+                      resource.data.organizerId == request.auth.uid;
+    }
+    
+    // ========== REGLAS PARA ASISTENCIAS ==========
+    match /attendances/{attendanceId} {
+      // Los usuarios pueden leer sus propias asistencias
+      allow read: if request.auth != null && 
+                    resource.data.userId == request.auth.uid;
+      
+      // Los organizadores pueden leer asistencias de sus eventos
+      allow read: if request.auth != null && 
+                    isOrganizer() &&
+                    exists(/databases/$(database)/documents/events/$(resource.data.eventId)) &&
+                    get(/databases/$(database)/documents/events/$(resource.data.eventId)).data.organizerId == request.auth.uid;
+      
+      // Cualquier usuario autenticado puede crear su propia asistencia
+      allow create: if request.auth != null && 
+                      request.resource.data.userId == request.auth.uid &&
+                      request.resource.data.status in ['CONFIRMED', 'CANCELLED'];
+      
+      // Los usuarios pueden actualizar solo sus propias asistencias
+      allow update: if request.auth != null && 
+                      resource.data.userId == request.auth.uid &&
+                      request.resource.data.userId == request.auth.uid &&
+                      request.resource.data.status in ['CONFIRMED', 'CANCELLED'];
+      
+      // Los usuarios pueden eliminar solo sus propias asistencias
+      allow delete: if request.auth != null && 
+                      resource.data.userId == request.auth.uid;
+    }
+    
+    // ========== REGLAS PARA COMENTARIOS ==========
+    match /comments/{commentId} {
+      // Cualquier usuario autenticado puede leer comentarios
+      allow read: if request.auth != null;
+      
+      // Cualquier usuario autenticado puede crear comentarios
+      allow create: if request.auth != null && 
+                      request.resource.data.userId == request.auth.uid &&
+                      request.resource.data.rating >= 1 &&
+                      request.resource.data.rating <= 5;
+      
+      // Solo el autor puede actualizar su comentario
+      allow update: if request.auth != null && 
+                      resource.data.userId == request.auth.uid &&
+                      request.resource.data.userId == request.auth.uid &&
+                      request.resource.data.rating >= 1 &&
+                      request.resource.data.rating <= 5;
+      
+      // Solo el autor puede eliminar su comentario
+      allow delete: if request.auth != null && 
+                      resource.data.userId == request.auth.uid;
+    }
+    
+    // ========== REGLAS PARA GASTOS (LEGACY - Mantener compatibilidad) ==========
+    match /expenses/{expenseId} {
+      allow create: if request.auth != null && 
+                      request.resource.data.userId == request.auth.uid;
+      
+      allow read, update, delete: if request.auth != null && 
+                                     resource.data.userId == request.auth.uid;
+    }
+    
+    // ========== REGLAS PARA HISTORIAL (LEGACY - Mantener compatibilidad) ==========
+    match /history/{historyId} {
+      allow create: if request.auth != null && 
+                      request.resource.data.userId == request.auth.uid;
+      
+      allow read: if request.auth != null && 
+                    resource.data.userId == request.auth.uid;
+      
+      allow delete: if request.auth != null && 
+                      resource.data.userId == request.auth.uid;
+    }
+    
+    // ========== REGLAS PARA CATEGORÍAS (LEGACY - Mantener compatibilidad) ==========
+    match /categories/{categoryId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+  }
+}
+
