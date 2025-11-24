@@ -8,3 +8,5 @@ Integrantes:
 5.Herbert William Solano Vásquez SV202844
 
 Enlace Trello: https://trello.com/b/cGa7lzMC/mi-tablero-de-trello
+
+![WhatsApp Image 2025-11-23 at 11 04 41 PM](https://github.com/user-attachments/assets/a47f898d-d7b0-401e-80a6-950ea6a78a14)
