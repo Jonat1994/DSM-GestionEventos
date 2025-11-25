@@ -36,6 +36,10 @@ android {
     kotlinOptions {
         jvmTarget = "11"
     }
+    
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.15"
+    }
 
     buildFeatures {
         compose = true
@@ -61,6 +65,10 @@ dependencies {
     implementation(libs.firebase.auth.ktx)
     implementation("com.google.firebase:firebase-auth:22.1.0") // verifica versión
     implementation("com.google.android.gms:play-services-auth:20.5.0") // verifica versión
+    implementation("com.google.firebase:firebase-storage:20.3.0")
+    
+    // Facebook Login
+    implementation("com.facebook.android:facebook-login:16.2.0")
 
 
 

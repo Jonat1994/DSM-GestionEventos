@@ -35,6 +35,61 @@ object FirestoreUtil {
             .addOnSuccessListener { onSuccess() }
             .addOnFailureListener { e -> onFailure(e) }
     }
+    
+    // Function to update user profile photo URL
+    fun updateUserPhotoUrl(
+        userId: String,
+        photoUrl: String,
+        onSuccess: () -> Unit,
+        onFailure: (Exception) -> Unit
+    ) {
+        usersCollection.document(userId)
+            .update("photoUrl", photoUrl)
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { e -> onFailure(e) }
+    }
+    
+    // Function to get user profile data
+    fun getUserProfile(
+        userId: String,
+        onSuccess: (Map<String, Any?>?) -> Unit,
+        onFailure: (Exception) -> Unit
+    ) {
+        usersCollection.document(userId)
+            .get()
+            .addOnSuccessListener { document ->
+                if (document.exists()) {
+                    onSuccess(document.data)
+                } else {
+                    onSuccess(null)
+                }
+            }
+            .addOnFailureListener { e -> onFailure(e) }
+    }
+    
+    // Function to update user additional info
+    fun updateUserInfo(
+        userId: String,
+        displayName: String? = null,
+        phone: String? = null,
+        bio: String? = null,
+        onSuccess: () -> Unit,
+        onFailure: (Exception) -> Unit
+    ) {
+        val updates = hashMapOf<String, Any>()
+        displayName?.let { updates["displayName"] = it }
+        phone?.let { updates["phone"] = it }
+        bio?.let { updates["bio"] = it }
+        
+        if (updates.isNotEmpty()) {
+            usersCollection.document(userId)
+                .update(updates)
+                .addOnSuccessListener { onSuccess() }
+                .addOnFailureListener { e -> onFailure(e) }
+        } else {
+            onSuccess()
+        }
+    }
 
     // 2. Function to get the user's role
     fun getUserRole(userId: String, onSuccess: (String?) -> Unit, onFailure: (Exception) -> Unit) {
@@ -111,7 +166,7 @@ object FirestoreUtil {
                     val category = document.getString("category") ?: ""
                     val date = document.getString("date") ?: ""
 
-                    // Eliminar el gasto
+                    // Eliminar el evento
                     expensesCollection.document(expenseId)
                         .delete()
                         .addOnSuccessListener {
@@ -134,7 +189,7 @@ object FirestoreUtil {
             .addOnFailureListener { onFailure(it) }
     }
 
-    // Función para actualizar un gasto
+    // Función para actualizar un evento
     fun updateExpense(expense: Expense, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
         expensesCollection.document(expense.id)
             .set(expense.toMap())
@@ -142,7 +197,7 @@ object FirestoreUtil {
             .addOnFailureListener { onFailure(it) }
     }
 
-    // Función para obtener el total mensual de gastos
+    // Función para obtener historial de eventos
     fun getMonthlyTotal(userId: String, year: Int, month: Int, onSuccess: (Double) -> Unit, onFailure: (Exception) -> Unit) {
         expensesCollection
             .whereEqualTo("userId", userId)

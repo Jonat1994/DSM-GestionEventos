@@ -90,7 +90,7 @@ class EventsListActivity : AppCompatActivity() {
                     true
                 }
                 R.id.nav_settings -> {
-                    Toast.makeText(this, "Ajustes próximamente", Toast.LENGTH_SHORT).show()
+                    startActivity(Intent(this, SettingsActivity::class.java))
                     binding.drawerLayout.closeDrawer(binding.navView)
                     true
                 }

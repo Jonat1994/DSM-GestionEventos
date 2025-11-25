@@ -26,4 +26,13 @@
     <string name="default_web_client_id">
         363781663770-ecktij3d6nqf84t3deeouib785u06np0.apps.googleusercontent.com
     </string>
+    
+    <!-- Facebook App ID - Reemplaza con tu App ID de Facebook -->
+    <string name="facebook_app_id">TU_FACEBOOK_APP_ID_AQUI</string>
+    
+    <!-- Facebook Client Token (opcional pero recomendado) -->
+    <string name="facebook_client_token">TU_FACEBOOK_CLIENT_TOKEN_AQUI</string>
+    
+    <!-- Facebook Login Protocol Scheme (debe ser "fb" + tu App ID) -->
+    <string name="fb_login_protocol_scheme">fbTU_FACEBOOK_APP_ID_AQUI</string>
 </resources>

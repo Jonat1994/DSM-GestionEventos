@@ -17,13 +17,20 @@ import com.google.android.gms.common.api.ApiException
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.auth.FacebookAuthProvider
 import android.util.Log
+import com.facebook.CallbackManager
+import com.facebook.FacebookCallback
+import com.facebook.FacebookException
+import com.facebook.login.LoginManager
+import com.facebook.login.LoginResult
 
 class LoginActivity : AppCompatActivity() {
 
     private lateinit var googleSignInClient: GoogleSignInClient
     private lateinit var binding: ActivityLoginBinding
     private lateinit var firebaseAuth: FirebaseAuth
+    private lateinit var callbackManager: CallbackManager
     
     // Activity Result Launcher para Google Sign-In
     private val googleSignInLauncher = registerForActivityResult(
@@ -116,6 +123,9 @@ class LoginActivity : AppCompatActivity() {
         // Inicializa Firebase explícitamente
         FirebaseApp.initializeApp(this)
         firebaseAuth = FirebaseAuth.getInstance()
+        
+        // Inicializar Facebook CallbackManager
+        callbackManager = CallbackManager.Factory.create()
 
         binding.notUserYet.setOnClickListener{
             val intent = Intent(this, RegisterActivity::class.java)
@@ -206,8 +216,71 @@ class LoginActivity : AppCompatActivity() {
 
         // Acción del botón de Facebook Sign-In
         binding.facebookSignInButton.setOnClickListener {
-            Toast.makeText(this, "Inicio de sesión con Facebook próximamente", Toast.LENGTH_SHORT).show()
-            // Aquí se puede implementar la autenticación con Facebook cuando esté configurada
+            Log.d("LoginActivity", "Iniciando Facebook Sign-In...")
+            try {
+                val facebookAppId = getString(R.string.facebook_app_id)
+                if (facebookAppId == "TU_FACEBOOK_APP_ID_AQUI" || facebookAppId.isEmpty()) {
+                    Toast.makeText(
+                        this,
+                        "Facebook App ID no configurado. Configura tu App ID en strings.xml",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    Log.e("LoginActivity", "Facebook App ID no configurado en strings.xml")
+                    return@setOnClickListener
+                }
+                
+                // Configurar permisos de Facebook Login
+                LoginManager.getInstance().logInWithReadPermissions(
+                    this,
+                    listOf("email", "public_profile")
+                )
+                
+                // Configurar callback de Facebook
+                LoginManager.getInstance().registerCallback(
+                    callbackManager,
+                    object : FacebookCallback<LoginResult> {
+                        override fun onSuccess(result: LoginResult) {
+                            Log.d("LoginActivity", "Facebook login exitoso")
+                            val token = result.accessToken
+                            if (token != null) {
+                                firebaseAuthWithFacebook(token.token)
+                            } else {
+                                Toast.makeText(
+                                    this@LoginActivity,
+                                    "Error: Token de Facebook es nulo",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                Log.e("LoginActivity", "Facebook token es nulo")
+                            }
+                        }
+                        
+                        override fun onCancel() {
+                            Log.d("LoginActivity", "Facebook login cancelado por el usuario")
+                            Toast.makeText(
+                                this@LoginActivity,
+                                "Inicio de sesión con Facebook cancelado",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                        
+                        override fun onError(error: FacebookException) {
+                            Log.e("LoginActivity", "Error en Facebook login", error)
+                            Toast.makeText(
+                                this@LoginActivity,
+                                "Error en Facebook login: ${error.message}",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                )
+            } catch (e: Exception) {
+                Toast.makeText(
+                    this,
+                    "Error al iniciar Facebook Sign-In: ${e.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
+                Log.e("LoginActivity", "Error al lanzar Facebook Sign-In", e)
+            }
         }
 
         // Toggle para mostrar/ocultar contraseña
@@ -265,6 +338,45 @@ class LoginActivity : AppCompatActivity() {
                     Log.e("LoginActivity", "Firebase signInWithCredential failed", task.exception)
                 }
             }
+    }
+
+    private fun firebaseAuthWithFacebook(token: String) {
+        val credential = FacebookAuthProvider.getCredential(token)
+        firebaseAuth.signInWithCredential(credential)
+            .addOnCompleteListener(this) { task ->
+                if (task.isSuccessful) {
+                    val user = firebaseAuth.currentUser
+                    if (user != null) {
+                        // Crear o actualizar documento de usuario en Firestore
+                        FirestoreUtil.createUserDocument(
+                            userId = user.uid,
+                            email = user.email ?: "",
+                            role = "usuario", // Por defecto es usuario
+                            onSuccess = {
+                                Log.d("LoginActivity", "Usuario creado/actualizado en Firestore")
+                                goToHome()
+                            },
+                            onFailure = { e ->
+                                Log.e("LoginActivity", "Error al crear documento de usuario", e)
+                                // Continuar de todas formas, el usuario ya está autenticado
+                                goToHome()
+                            }
+                        )
+                    } else {
+                        goToHome()
+                    }
+                } else {
+                    val errorMessage = task.exception?.message ?: "Error desconocido"
+                    Toast.makeText(this, "Error con Firebase: $errorMessage", Toast.LENGTH_SHORT).show()
+                    Log.e("LoginActivity", "Firebase signInWithCredential failed", task.exception)
+                }
+            }
+    }
+    
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        // Pasar el resultado al CallbackManager de Facebook
+        callbackManager.onActivityResult(requestCode, resultCode, data)
     }
 
     private fun goToHome() {

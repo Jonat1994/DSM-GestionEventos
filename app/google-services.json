@@ -43,11 +43,11 @@
       },
       "oauth_client": [
         {
-          "client_id": "678522294233-r2kj03f9n135tfkdq1a46gta591samnv.apps.googleusercontent.com",
+          "client_id": "678522294233-lgsu95b4ac7rmg7s2ljfke2hrqa27ou3.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.foro_2",
-            "certificate_hash": "f36c70bbcbb25d4bdd8aaf4b28f489fc4f1cb584"
+            "certificate_hash": "86e9b730469f114076f8950519e13778b3a65d01"
           }
         },
         {
