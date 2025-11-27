@@ -18,6 +18,7 @@ import com.google.firebase.storage.FirebaseStorage
 import android.util.Log
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import android.provider.MediaStore
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
@@ -26,6 +27,8 @@ import com.bumptech.glide.Glide
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.InputStream
+import android.content.ContentResolver
 
 class SettingsActivity : AppCompatActivity() {
 
@@ -40,6 +43,17 @@ class SettingsActivity : AppCompatActivity() {
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
+            showImageSourceDialog()
+        } else {
+            Toast.makeText(this, "Permiso denegado. No se puede acceder a la galería.", Toast.LENGTH_SHORT).show()
+        }
+    }
+    
+    private val requestMultiplePermissionsLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val allGranted = permissions.all { it.value }
+        if (allGranted) {
             showImageSourceDialog()
         } else {
             Toast.makeText(this, "Permiso denegado. No se puede acceder a la galería.", Toast.LENGTH_SHORT).show()
@@ -145,7 +159,11 @@ class SettingsActivity : AppCompatActivity() {
             saveCommentNotificationPreference(isChecked)
         }
         
-        // Privacidad
+        // Privacidad - Autenticación biométrica
+        binding.switchBiometric.setOnCheckedChangeListener { _, isChecked ->
+            handleBiometricToggle(isChecked)
+        }
+        
         binding.cardPrivacyPolicy.setOnClickListener {
             openPrivacyPolicy()
         }
@@ -171,6 +189,25 @@ class SettingsActivity : AppCompatActivity() {
         binding.switchNotifications.isChecked = sharedPreferences.getBoolean("notifications_enabled", true)
         binding.switchEventReminders.isChecked = sharedPreferences.getBoolean("event_reminders_enabled", true)
         binding.switchCommentNotifications.isChecked = sharedPreferences.getBoolean("comment_notifications_enabled", true)
+        
+        // Cargar preferencia de autenticación biométrica
+        try {
+            val secureStorage = SecureStorageHelper(this)
+            val biometricHelper = BiometricHelper(this)
+            val isBiometricAvailable = biometricHelper.isBiometricAvailable()
+            val isBiometricEnabled = secureStorage.isBiometricEnabled()
+            
+            binding.switchBiometric.isChecked = isBiometricEnabled
+            binding.switchBiometric.isEnabled = isBiometricAvailable
+            
+            if (!isBiometricAvailable) {
+                binding.switchBiometric.alpha = 0.5f
+            }
+        } catch (e: Exception) {
+            Log.e("SettingsActivity", "Error al cargar configuración biométrica", e)
+            binding.switchBiometric.isEnabled = false
+            binding.switchBiometric.alpha = 0.5f
+        }
     }
     
     // ========== EDITAR PERFIL ==========
@@ -423,6 +460,71 @@ class SettingsActivity : AppCompatActivity() {
         sharedPreferences.edit().putBoolean("comment_notifications_enabled", enabled).apply()
     }
     
+    // ========== AUTENTICACIÓN BIOMÉTRICA ==========
+    private fun handleBiometricToggle(isEnabled: Boolean) {
+        val secureStorage = SecureStorageHelper(this)
+        val user = firebaseAuth.currentUser
+        
+        if (isEnabled) {
+            // Habilitar autenticación biométrica
+            if (user != null && user.email != null) {
+                // Necesitamos la contraseña para guardarla. Mostrar diálogo para confirmar contraseña
+                showPasswordConfirmationDialog { password ->
+                    if (password.isNotEmpty()) {
+                        // Verificar que la contraseña es correcta antes de guardar
+                        val credential = com.google.firebase.auth.EmailAuthProvider.getCredential(user.email!!, password)
+                        user.reauthenticate(credential)
+                            .addOnSuccessListener {
+                                // Contraseña correcta, guardar credenciales
+                                secureStorage.saveCredentials(user.email!!, password)
+                                secureStorage.setBiometricEnabled(true)
+                                Toast.makeText(this, "Autenticación biométrica habilitada", Toast.LENGTH_SHORT).show()
+                                Log.d("SettingsActivity", "Autenticación biométrica habilitada")
+                            }
+                            .addOnFailureListener { e ->
+                                Log.e("SettingsActivity", "Error al verificar contraseña", e)
+                                Toast.makeText(this, "Contraseña incorrecta", Toast.LENGTH_SHORT).show()
+                                binding.switchBiometric.isChecked = false
+                            }
+                    } else {
+                        binding.switchBiometric.isChecked = false
+                    }
+                }
+            } else {
+                Toast.makeText(this, "No se puede habilitar. Inicia sesión con email y contraseña primero.", Toast.LENGTH_LONG).show()
+                binding.switchBiometric.isChecked = false
+            }
+        } else {
+            // Deshabilitar autenticación biométrica
+            secureStorage.setBiometricEnabled(false)
+            secureStorage.clearCredentials()
+            Toast.makeText(this, "Autenticación biométrica deshabilitada", Toast.LENGTH_SHORT).show()
+            Log.d("SettingsActivity", "Autenticación biométrica deshabilitada")
+        }
+    }
+    
+    private fun showPasswordConfirmationDialog(onConfirm: (String) -> Unit) {
+        val builder = AlertDialog.Builder(this)
+        builder.setTitle("Confirmar contraseña")
+        builder.setMessage("Ingresa tu contraseña para habilitar la autenticación biométrica")
+        
+        val input = android.widget.EditText(this)
+        input.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+        input.hint = "Contraseña"
+        builder.setView(input)
+        
+        builder.setPositiveButton("Confirmar") { _, _ ->
+            val password = input.text.toString()
+            onConfirm(password)
+        }
+        
+        builder.setNegativeButton("Cancelar") { dialog, _ ->
+            dialog.cancel()
+        }
+        
+        builder.show()
+    }
+    
     // ========== PRIVACIDAD ==========
     private fun openPrivacyPolicy() {
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.example.com/privacy-policy"))
@@ -448,15 +550,25 @@ class SettingsActivity : AppCompatActivity() {
     
     // ========== SUBIR FOTO DE PERFIL ==========
     private fun checkPermissionAndSelectImage() {
-        when {
-            ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.READ_EXTERNAL_STORAGE
-            ) == PackageManager.PERMISSION_GRANTED -> {
-                showImageSourceDialog()
-            }
-            else -> {
-                requestPermissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
+        // En Android 13+ (API 33+), usar READ_MEDIA_IMAGES
+        // En versiones anteriores, usar READ_EXTERNAL_STORAGE
+        // Para ACTION_GET_CONTENT no se necesita permiso en Android 13+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            // Android 13+: usar READ_MEDIA_IMAGES solo para ACTION_PICK
+            // Pero mejor usar ACTION_GET_CONTENT que no requiere permisos
+            showImageSourceDialog()
+        } else {
+            // Android 12 y anteriores: verificar READ_EXTERNAL_STORAGE
+            when {
+                ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.READ_EXTERNAL_STORAGE
+                ) == PackageManager.PERMISSION_GRANTED -> {
+                    showImageSourceDialog()
+                }
+                else -> {
+                    requestPermissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
+                }
             }
         }
     }
@@ -476,8 +588,16 @@ class SettingsActivity : AppCompatActivity() {
     }
     
     private fun pickImageFromGallery() {
-        val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
-        pickImageLauncher.launch(intent)
+        // Usar ACTION_GET_CONTENT que funciona mejor en Android 13+ sin permisos
+        val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+            type = "image/*"
+            addCategory(Intent.CATEGORY_OPENABLE)
+        }
+        // Intent alternativo si ACTION_GET_CONTENT no está disponible
+        val pickIntent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+        val chooserIntent = Intent.createChooser(intent, "Seleccionar imagen")
+        chooserIntent.putExtra(Intent.EXTRA_INITIAL_INTENTS, arrayOf(pickIntent))
+        pickImageLauncher.launch(chooserIntent)
     }
     
     private fun takePictureWithCamera() {
@@ -504,49 +624,91 @@ class SettingsActivity : AppCompatActivity() {
         
         Toast.makeText(this, "Subiendo foto...", Toast.LENGTH_SHORT).show()
         
-        val storageRef = storage.reference
-        val photoRef = storageRef.child("profile_photos/${user.uid}.jpg")
-        
-        photoRef.putFile(imageUri)
-            .addOnSuccessListener { taskSnapshot ->
-                photoRef.downloadUrl.addOnSuccessListener { uri ->
-                    val photoUrl = uri.toString()
-                    
-                    // Actualizar en Firestore
-                    FirestoreUtil.updateUserPhotoUrl(
-                        userId = user.uid,
-                        photoUrl = photoUrl,
-                        onSuccess = {
-                            // Actualizar también en Firebase Auth
-                            val profileUpdates = com.google.firebase.auth.UserProfileChangeRequest.Builder()
-                                .setPhotoUri(uri)
-                                .build()
-                            
-                            user.updateProfile(profileUpdates)
-                                .addOnCompleteListener { task ->
-                                    if (task.isSuccessful) {
-                                        Toast.makeText(this, "Foto de perfil actualizada", Toast.LENGTH_SHORT).show()
-                                        loadSettings()
-                                    } else {
-                                        Toast.makeText(this, "Foto guardada, pero error al actualizar perfil", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                        },
-                        onFailure = { e ->
-                            Toast.makeText(this, "Error al guardar URL: ${e.message}", Toast.LENGTH_SHORT).show()
-                            Log.e("SettingsActivity", "Error al guardar URL de foto", e)
-                        }
-                    )
+        try {
+            // Copiar la imagen a un archivo temporal para evitar problemas con URIs de contenido
+            val tempDir = getExternalFilesDir(null) ?: cacheDir
+            val tempFile = File(tempDir, "temp_profile_${System.currentTimeMillis()}.jpg")
+            
+            contentResolver.openInputStream(imageUri)?.use { inputStream ->
+                FileOutputStream(tempFile).use { outputStream ->
+                    inputStream.copyTo(outputStream)
                 }
+            } ?: run {
+                Toast.makeText(this, "Error al leer la imagen seleccionada", Toast.LENGTH_SHORT).show()
+                Log.e("SettingsActivity", "No se pudo abrir el InputStream de la URI")
+                return
             }
-            .addOnFailureListener { e ->
-                Toast.makeText(this, "Error al subir foto: ${e.message}", Toast.LENGTH_SHORT).show()
-                Log.e("SettingsActivity", "Error al subir foto", e)
-            }
-            .addOnProgressListener { taskSnapshot ->
-                val progress = (100.0 * taskSnapshot.bytesTransferred / taskSnapshot.totalByteCount)
-                Log.d("SettingsActivity", "Progreso de subida: $progress%")
-            }
+            
+            val tempUri = FileProvider.getUriForFile(
+                this,
+                "${packageName}.fileprovider",
+                tempFile
+            )
+            val storageRef = storage.reference
+            val photoRef = storageRef.child("profile_photos/${user.uid}.jpg")
+            
+            photoRef.putFile(tempUri)
+                .addOnSuccessListener { taskSnapshot ->
+                    photoRef.downloadUrl.addOnSuccessListener { uri ->
+                        val photoUrl = uri.toString()
+                        
+                        // Actualizar en Firestore
+                        FirestoreUtil.updateUserPhotoUrl(
+                            userId = user.uid,
+                            photoUrl = photoUrl,
+                            onSuccess = {
+                                // Actualizar también en Firebase Auth
+                                val profileUpdates = com.google.firebase.auth.UserProfileChangeRequest.Builder()
+                                    .setPhotoUri(uri)
+                                    .build()
+                                
+                                user.updateProfile(profileUpdates)
+                                    .addOnCompleteListener { task ->
+                                        if (task.isSuccessful) {
+                                            Toast.makeText(this, "Foto de perfil actualizada", Toast.LENGTH_SHORT).show()
+                                            loadSettings()
+                                        } else {
+                                            Toast.makeText(this, "Foto guardada, pero error al actualizar perfil", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                            },
+                            onFailure = { e ->
+                                Toast.makeText(this, "Error al guardar URL: ${e.message}", Toast.LENGTH_SHORT).show()
+                                Log.e("SettingsActivity", "Error al guardar URL de foto", e)
+                            }
+                        )
+                        
+                        // Limpiar archivo temporal
+                        try {
+                            if (tempFile.exists()) {
+                                tempFile.delete()
+                            }
+                        } catch (e: Exception) {
+                            Log.e("SettingsActivity", "Error al eliminar archivo temporal", e)
+                        }
+                    }
+                }
+                .addOnFailureListener { e ->
+                    Toast.makeText(this, "Error al subir foto: ${e.message}", Toast.LENGTH_SHORT).show()
+                    Log.e("SettingsActivity", "Error al subir foto", e)
+                    
+                    // Limpiar archivo temporal en caso de error
+                    try {
+                        if (tempFile.exists()) {
+                            tempFile.delete()
+                        }
+                    } catch (ex: Exception) {
+                        Log.e("SettingsActivity", "Error al eliminar archivo temporal", ex)
+                    }
+                }
+                .addOnProgressListener { taskSnapshot ->
+                    val progress = (100.0 * taskSnapshot.bytesTransferred / taskSnapshot.totalByteCount)
+                    Log.d("SettingsActivity", "Progreso de subida: $progress%")
+                }
+        } catch (e: Exception) {
+            Toast.makeText(this, "Error al procesar imagen: ${e.message}", Toast.LENGTH_SHORT).show()
+            Log.e("SettingsActivity", "Error al procesar imagen", e)
+        }
     }
 }
 

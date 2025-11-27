@@ -41,6 +41,63 @@ class EventsListActivity : AppCompatActivity() {
         setupFloatingActionButton()
         setupFilters()
         loadUserRole()
+        initializeFCMToken()
+        
+        // Crear canal de notificaciones
+        NotificationHelper.createNotificationChannel(this)
+    }
+    
+    private fun initializeFCMToken() {
+        val user = firebaseAuth.currentUser
+        if (user != null) {
+            android.util.Log.d("EventsListActivity", "Inicializando token FCM para usuario: ${user.uid}")
+            
+            com.google.firebase.messaging.FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+                if (!task.isSuccessful) {
+                    android.util.Log.e("EventsListActivity", "Error al obtener token FCM", task.exception)
+                    task.exception?.printStackTrace()
+                    return@addOnCompleteListener
+                }
+                
+                val token = task.result
+                android.util.Log.d("EventsListActivity", "Token FCM obtenido exitosamente")
+                android.util.Log.d("EventsListActivity", "Token: ${token.take(50)}...")
+                
+                // Guardar token en Firestore
+                val userRef = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    .collection("users")
+                    .document(user.uid)
+                
+                userRef.get().addOnSuccessListener { document ->
+                    val currentToken = document.getString("fcmToken")
+                    if (currentToken != token) {
+                        // Solo actualizar si el token cambió
+                        userRef.update("fcmToken", token)
+                            .addOnSuccessListener {
+                                android.util.Log.d("EventsListActivity", "Token FCM guardado/actualizado en Firestore")
+                            }
+                            .addOnFailureListener { e ->
+                                android.util.Log.e("EventsListActivity", "Error al guardar token FCM en Firestore", e)
+                                e.printStackTrace()
+                            }
+                    } else {
+                        android.util.Log.d("EventsListActivity", "Token FCM ya está actualizado")
+                    }
+                }.addOnFailureListener { e ->
+                    android.util.Log.e("EventsListActivity", "Error al leer documento de usuario", e)
+                    // Intentar crear/actualizar de todas formas
+                    userRef.set(mapOf("fcmToken" to token), com.google.firebase.firestore.SetOptions.merge())
+                        .addOnSuccessListener {
+                            android.util.Log.d("EventsListActivity", "Token FCM guardado usando merge")
+                        }
+                        .addOnFailureListener { e2 ->
+                            android.util.Log.e("EventsListActivity", "Error al guardar token FCM con merge", e2)
+                        }
+                }
+            }
+        } else {
+            android.util.Log.w("EventsListActivity", "Usuario no autenticado, no se puede obtener token FCM")
+        }
     }
     
     private fun setupToolbar() {

@@ -4,15 +4,16 @@
     android:layout_height="match_parent"
     android:background="@color/black">
 
-    <!-- VideoView para reproducir el video a pantalla completa -->
-    <VideoView
-        android:id="@+id/videoView"
+    <!-- ImageView para mostrar el GIF a pantalla completa -->
+    <ImageView
+        android:id="@+id/gifImageView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_gravity="center"
+        android:scaleType="centerCrop"
         android:visibility="gone" />
 
-    <!-- Layout para mostrar el icono personalizado antes del video -->
+    <!-- Layout para mostrar el icono personalizado antes del GIF -->
     <LinearLayout
         android:id="@+id/iconLayout"
         android:layout_width="match_parent"

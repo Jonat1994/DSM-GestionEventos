@@ -158,6 +158,9 @@ class LoginActivity : AppCompatActivity() {
         val emailEditText = binding.emailEditText
         val passwordEditText = binding.passwordEditText
 
+        // Configurar switch de autenticación biométrica
+        setupBiometricSwitch()
+
         // Acción del botón de login tradicional
         binding.loginButton.setOnClickListener {
             val email = emailEditText.text.toString().trim()
@@ -177,6 +180,15 @@ class LoginActivity : AppCompatActivity() {
             firebaseAuth.signInWithEmailAndPassword(email, password).addOnCompleteListener { task ->
                 if (task.isSuccessful) {
                     Log.d("LoginActivity", "Inicio de sesión exitoso")
+                    
+                    // Guardar credenciales de forma segura para autenticación biométrica
+                    val secureStorage = SecureStorageHelper(this)
+                    secureStorage.saveCredentials(email, password)
+                    Log.d("LoginActivity", "Credenciales guardadas para autenticación biométrica")
+                    
+                    // Obtener y guardar token FCM
+                    initializeFCMToken()
+                    
                     val intent = Intent(this, EventsListActivity::class.java)
                     startActivity(intent)
                     finish()
@@ -307,6 +319,118 @@ class LoginActivity : AppCompatActivity() {
         return email.isNotEmpty() && Patterns.EMAIL_ADDRESS.matcher(email).matches()
     }
 
+    private fun setupBiometricSwitch() {
+        val secureStorage = SecureStorageHelper(this)
+        val biometricHelper = BiometricHelper(this)
+        
+        // Verificar si hay credenciales guardadas y si el dispositivo soporta biométrica
+        val hasCredentials = secureStorage.hasSavedCredentials()
+        val isBiometricAvailable = try {
+            biometricHelper.isBiometricAvailable()
+        } catch (e: Exception) {
+            Log.e("LoginActivity", "Error al verificar disponibilidad biométrica", e)
+            false
+        }
+        
+        // Habilitar switch solo si hay credenciales y biométrica disponible
+        binding.switchBiometricLogin.isEnabled = hasCredentials && isBiometricAvailable
+        
+        if (!hasCredentials || !isBiometricAvailable) {
+            binding.switchBiometricLogin.alpha = 0.5f
+        }
+        
+        // Listener del switch
+        binding.switchBiometricLogin.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                // Activar modo huella: ocultar contraseña y mostrar prompt biométrico
+                binding.passwordContainer.visibility = android.view.View.GONE
+                binding.forgotPassword.visibility = android.view.View.GONE
+                
+                // Verificar que hay credenciales guardadas (verificar de nuevo por si acaban de guardarse)
+                val currentHasCredentials = secureStorage.hasSavedCredentials()
+                if (currentHasCredentials) {
+                    // Mostrar prompt biométrico
+                    showBiometricPromptForLogin(secureStorage, biometricHelper)
+                } else {
+                    Toast.makeText(this, "No hay credenciales guardadas. Inicia sesión con contraseña primero.", Toast.LENGTH_LONG).show()
+                    binding.switchBiometricLogin.isChecked = false
+                    binding.passwordContainer.visibility = android.view.View.VISIBLE
+                    binding.forgotPassword.visibility = android.view.View.VISIBLE
+                }
+            } else {
+                // Desactivar modo huella: mostrar contraseña
+                binding.passwordContainer.visibility = android.view.View.VISIBLE
+                binding.forgotPassword.visibility = android.view.View.VISIBLE
+            }
+        }
+    }
+    
+    private fun showBiometricPromptForLogin(secureStorage: SecureStorageHelper, biometricHelper: BiometricHelper) {
+        biometricHelper.showBiometricPrompt(
+            title = "Autenticación biométrica",
+            subtitle = "Usa tu huella dactilar o reconocimiento facial para iniciar sesión",
+            negativeButtonText = "Usar contraseña",
+            onSuccess = {
+                // Autenticación biométrica exitosa, iniciar sesión con credenciales guardadas
+                val credentials = secureStorage.getCredentials()
+                val email = credentials.first
+                val password = credentials.second
+                if (email != null && password != null && email.isNotEmpty() && password.isNotEmpty()) {
+                    Log.d("LoginActivity", "Autenticación biométrica exitosa, iniciando sesión...")
+                    signInWithSavedCredentials(email, password)
+                } else {
+                    Log.e("LoginActivity", "No se encontraron credenciales guardadas")
+                    Toast.makeText(this, "Error: No se encontraron credenciales guardadas", Toast.LENGTH_SHORT).show()
+                    binding.switchBiometricLogin.isChecked = false
+                    binding.passwordContainer.visibility = android.view.View.VISIBLE
+                    binding.forgotPassword.visibility = android.view.View.VISIBLE
+                }
+            },
+            onError = { error ->
+                Log.e("LoginActivity", "Error en autenticación biométrica: $error")
+                Toast.makeText(this, error, Toast.LENGTH_SHORT).show()
+                binding.switchBiometricLogin.isChecked = false
+                binding.passwordContainer.visibility = android.view.View.VISIBLE
+                binding.forgotPassword.visibility = android.view.View.VISIBLE
+            },
+            onCancel = {
+                Log.d("LoginActivity", "Autenticación biométrica cancelada")
+                binding.switchBiometricLogin.isChecked = false
+                binding.passwordContainer.visibility = android.view.View.VISIBLE
+                binding.forgotPassword.visibility = android.view.View.VISIBLE
+            }
+        )
+    }
+    
+    private fun signInWithSavedCredentials(email: String, password: String) {
+        try {
+            firebaseAuth.signInWithEmailAndPassword(email, password)
+                .addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        Log.d("LoginActivity", "Inicio de sesión exitoso con credenciales guardadas")
+                        val intent = Intent(this, EventsListActivity::class.java)
+                        startActivity(intent)
+                        finish()
+                    } else {
+                        Log.e("LoginActivity", "Error al iniciar sesión con credenciales guardadas", task.exception)
+                        // Si las credenciales no funcionan, eliminarlas y mostrar contraseña
+                        val secureStorage = SecureStorageHelper(this)
+                        secureStorage.clearCredentials()
+                        Toast.makeText(this, "Las credenciales guardadas ya no son válidas. Usa tu contraseña.", Toast.LENGTH_LONG).show()
+                        binding.switchBiometricLogin.isChecked = false
+                        binding.passwordContainer.visibility = android.view.View.VISIBLE
+                        binding.forgotPassword.visibility = android.view.View.VISIBLE
+                    }
+                }
+        } catch (e: Exception) {
+            Log.e("LoginActivity", "Error al iniciar sesión con credenciales guardadas", e)
+            Toast.makeText(this, "Error al iniciar sesión: ${e.message}", Toast.LENGTH_SHORT).show()
+            binding.switchBiometricLogin.isChecked = false
+            binding.passwordContainer.visibility = android.view.View.VISIBLE
+            binding.forgotPassword.visibility = android.view.View.VISIBLE
+        }
+    }
+
     private fun firebaseAuthWithGoogle(idToken: String) {
         val credential = GoogleAuthProvider.getCredential(idToken, null)
         firebaseAuth.signInWithCredential(credential)
@@ -380,8 +504,70 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun goToHome() {
+        // Obtener y guardar token FCM
+        initializeFCMToken()
+        
         val intent = Intent(this, EventsListActivity::class.java)
         startActivity(intent)
         finish()
+    }
+    
+    private fun initializeFCMToken() {
+        val user = firebaseAuth.currentUser
+        if (user != null) {
+            Log.d("LoginActivity", "Inicializando token FCM para usuario: ${user.uid}")
+            
+            com.google.firebase.messaging.FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+                if (!task.isSuccessful) {
+                    Log.e("LoginActivity", "Error al obtener token FCM", task.exception)
+                    task.exception?.printStackTrace()
+                    return@addOnCompleteListener
+                }
+                
+                val token = task.result
+                Log.d("LoginActivity", "Token FCM obtenido exitosamente")
+                Log.d("LoginActivity", "Token: ${token.take(50)}...")
+                
+                // Guardar token en Firestore usando merge para no sobrescribir otros campos
+                val userRef = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    .collection("users")
+                    .document(user.uid)
+                
+                userRef.get().addOnSuccessListener { document ->
+                    val currentToken = document.getString("fcmToken")
+                    if (currentToken != token) {
+                        // Solo actualizar si el token cambió
+                        userRef.update("fcmToken", token)
+                            .addOnSuccessListener {
+                                Log.d("LoginActivity", "Token FCM guardado/actualizado en Firestore")
+                            }
+                            .addOnFailureListener { e ->
+                                Log.e("LoginActivity", "Error al guardar token FCM en Firestore", e)
+                                e.printStackTrace()
+                                // Intentar con merge como fallback
+                                userRef.set(mapOf("fcmToken" to token), com.google.firebase.firestore.SetOptions.merge())
+                                    .addOnSuccessListener {
+                                        Log.d("LoginActivity", "Token FCM guardado usando merge (fallback)")
+                                    }
+                            }
+                    } else {
+                        Log.d("LoginActivity", "Token FCM ya está actualizado")
+                    }
+                }.addOnFailureListener { e ->
+                    Log.e("LoginActivity", "Error al leer documento de usuario, usando merge", e)
+                    // Si falla la lectura, usar merge directamente
+                    userRef.set(mapOf("fcmToken" to token), com.google.firebase.firestore.SetOptions.merge())
+                        .addOnSuccessListener {
+                            Log.d("LoginActivity", "Token FCM guardado usando merge")
+                        }
+                        .addOnFailureListener { e2 ->
+                            Log.e("LoginActivity", "Error al guardar token FCM con merge", e2)
+                            e2.printStackTrace()
+                        }
+                }
+            }
+        } else {
+            Log.w("LoginActivity", "Usuario no autenticado, no se puede obtener token FCM")
+        }
     }
 }

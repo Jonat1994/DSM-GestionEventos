@@ -45,6 +45,33 @@ class EventDetailsActivity : AppCompatActivity() {
         loadAttendeesCount()
     }
     
+    override fun onResume() {
+        super.onResume()
+        // Recrear el listener cuando la actividad se reanuda
+        setupAttendanceListener()
+    }
+    
+    private fun setupAttendanceListener() {
+        // Remover listener anterior si existe
+        attendanceListener?.remove()
+        
+        if (eventId == null) {
+            android.util.Log.w("EventDetailsActivity", "No se puede configurar listener: eventId es null")
+            return
+        }
+        
+        android.util.Log.d("EventDetailsActivity", "Configurando listener de asistencias para evento: $eventId")
+        
+        // Escuchar cambios en tiempo real en las asistencias
+        attendanceListener = FirestoreUtil.listenToEventAttendances(eventId!!) { attendances ->
+            runOnUiThread {
+                val count = attendances.size
+                binding.textViewAttendeesCount.text = getString(R.string.attendees_count, count)
+                android.util.Log.d("EventDetailsActivity", "✓ Conteo de asistencia actualizado en tiempo real: $count")
+            }
+        }
+    }
+    
     private fun setupUI() {
         binding.btnConfirmAttendance.setOnClickListener {
             confirmAttendance()
@@ -99,17 +126,17 @@ class EventDetailsActivity : AppCompatActivity() {
                 if (event != null) {
                     currentEvent = event
                     binding.textViewTitle.text = event.title
-                    binding.textViewDate.text = "${event.date} ${event.time}"
+                    binding.textViewDate.text = getString(R.string.date_time_format, event.date, event.time)
                     binding.textViewLocation.text = event.location
                     binding.textViewDescription.text = event.description
                     updateUIForRole()
                 } else {
-                    Toast.makeText(this, "Evento no encontrado", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, getString(R.string.event_not_found), Toast.LENGTH_SHORT).show()
                     finish()
                 }
             },
             onFailure = {
-                Toast.makeText(this, "Error al cargar evento: ${it.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.error_loading_event, it.message ?: ""), Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -148,14 +175,20 @@ class EventDetailsActivity : AppCompatActivity() {
             status = "CONFIRMED"
         )
         
+        android.util.Log.d("EventDetailsActivity", "Confirmando asistencia para evento: $eventId")
+        
         FirestoreUtil.confirmAttendance(attendance,
             onSuccess = {
-                Toast.makeText(this, "Asistencia confirmada", Toast.LENGTH_SHORT).show()
+                android.util.Log.d("EventDetailsActivity", "Asistencia confirmada exitosamente")
+                Toast.makeText(this, getString(R.string.attendance_confirmed), Toast.LENGTH_SHORT).show()
                 checkAttendance()
+                // El listener en tiempo real actualizará el conteo automáticamente
+                // Pero también cargamos manualmente por si acaso
                 loadAttendeesCount()
             },
-            onFailure = {
-                Toast.makeText(this, "Error: ${it.message}", Toast.LENGTH_SHORT).show()
+            onFailure = { error ->
+                android.util.Log.e("EventDetailsActivity", "Error al confirmar asistencia", error)
+                Toast.makeText(this, getString(R.string.error_attendance, error.message ?: ""), Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -165,12 +198,12 @@ class EventDetailsActivity : AppCompatActivity() {
         
         FirestoreUtil.cancelAttendance(user.uid, eventId!!,
             onSuccess = {
-                Toast.makeText(this, "Asistencia cancelada", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.attendance_cancelled), Toast.LENGTH_SHORT).show()
                 checkAttendance()
                 loadAttendeesCount()
             },
             onFailure = {
-                Toast.makeText(this, "Error: ${it.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.error_attendance, it.message ?: ""), Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -178,10 +211,12 @@ class EventDetailsActivity : AppCompatActivity() {
     private fun loadAttendeesCount() {
         FirestoreUtil.getConfirmedAttendeesCount(eventId!!,
             onSuccess = { count ->
-                binding.textViewAttendeesCount.text = "$count asistentes confirmados"
+                binding.textViewAttendeesCount.text = getString(R.string.attendees_count, count)
+                android.util.Log.d("EventDetailsActivity", "Conteo inicial de asistencia: $count")
             },
-            onFailure = {
-                binding.textViewAttendeesCount.text = "0 asistentes confirmados"
+            onFailure = { error ->
+                android.util.Log.e("EventDetailsActivity", "Error al cargar conteo de asistencia", error)
+                binding.textViewAttendeesCount.text = getString(R.string.attendees_count_zero)
             }
         )
     }
@@ -191,10 +226,10 @@ class EventDetailsActivity : AppCompatActivity() {
             if (comments.isNotEmpty()) {
                 val previewComments = comments.take(2)
                 binding.textViewCommentsPreview.text = previewComments.joinToString("\n") { 
-                    "${it.userName}: ${it.text}"
+                    getString(R.string.comment_format, it.userName, it.text)
                 }
             } else {
-                binding.textViewCommentsPreview.text = "No hay comentarios aún"
+                binding.textViewCommentsPreview.text = getString(R.string.no_comments)
             }
         }
     }
@@ -211,8 +246,16 @@ class EventDetailsActivity : AppCompatActivity() {
     
     override fun onPause() {
         super.onPause()
+        // No remover el listener aquí, solo en onDestroy
+        // Esto permite que se actualice cuando la actividad está en segundo plano
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        // Remover listeners solo cuando la actividad se destruye completamente
         attendanceListener?.remove()
         commentsListener?.remove()
+        android.util.Log.d("EventDetailsActivity", "Listeners removidos en onDestroy")
     }
 }
 

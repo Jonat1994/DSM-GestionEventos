@@ -47,11 +47,14 @@ service cloud.firestore {
     
     // ========== REGLAS PARA ASISTENCIAS ==========
     match /attendances/{attendanceId} {
-      // Los usuarios pueden leer sus propias asistencias
+      // Cualquier usuario autenticado puede leer asistencias (necesario para ver conteo de asistentes)
+      allow read: if request.auth != null;
+      
+      // Los usuarios pueden leer sus propias asistencias (regla adicional para claridad)
       allow read: if request.auth != null && 
                     resource.data.userId == request.auth.uid;
       
-      // Los organizadores pueden leer asistencias de sus eventos
+      // Los organizadores pueden leer asistencias de sus eventos (regla adicional)
       allow read: if request.auth != null && 
                     isOrganizer() &&
                     exists(/databases/$(database)/documents/events/$(resource.data.eventId)) &&

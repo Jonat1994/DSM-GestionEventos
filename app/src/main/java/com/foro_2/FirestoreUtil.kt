@@ -323,11 +323,115 @@ object FirestoreUtil {
     
     // Crear evento (solo organizadores)
     fun createEvent(event: Event, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
-        val docRef = eventsCollection.document()
-        val eventWithId = event.copy(id = docRef.id)
-        docRef.set(eventWithId.toMap())
-            .addOnSuccessListener { onSuccess() }
-            .addOnFailureListener { onFailure(it) }
+        try {
+            val docRef = eventsCollection.document()
+            val eventWithId = event.copy(id = docRef.id)
+            val eventMap = eventWithId.toMap()
+            
+            Log.d("FirestoreUtil", "Creando evento con ID: ${eventWithId.id}")
+            Log.d("FirestoreUtil", "Datos del evento: $eventMap")
+            Log.d("FirestoreUtil", "OrganizerId: ${eventWithId.organizerId}")
+            Log.d("FirestoreUtil", "Título: ${eventWithId.title}")
+            
+            docRef.set(eventMap)
+                .addOnSuccessListener { 
+                    Log.d("FirestoreUtil", "Evento guardado exitosamente en Firestore con ID: ${eventWithId.id}")
+                    // Enviar notificaciones a todos los usuarios después de crear el evento
+                    sendEventNotificationToUsers(eventWithId)
+                    onSuccess() 
+                }
+                .addOnFailureListener { exception ->
+                    Log.e("FirestoreUtil", "Error al guardar evento en Firestore", exception)
+                    Log.e("FirestoreUtil", "Código de error: ${exception.javaClass.simpleName}")
+                    Log.e("FirestoreUtil", "Mensaje: ${exception.message}")
+                    exception.printStackTrace()
+                    onFailure(exception)
+                }
+        } catch (e: Exception) {
+            Log.e("FirestoreUtil", "Excepción al crear evento", e)
+            e.printStackTrace()
+            onFailure(e)
+        }
+    }
+    
+    // Enviar notificaciones a todos los usuarios cuando se crea un evento
+    private fun sendEventNotificationToUsers(event: Event) {
+        Log.d("FirestoreUtil", "=== INICIANDO ENVÍO DE NOTIFICACIONES ===")
+        Log.d("FirestoreUtil", "Evento: ${event.title} (ID: ${event.id})")
+        
+        // Obtener todos los usuarios con rol "usuario" (no organizadores)
+        usersCollection
+            .whereEqualTo("role", "usuario")
+            .get()
+            .addOnSuccessListener { documents ->
+                Log.d("FirestoreUtil", "Total de usuarios encontrados: ${documents.size()}")
+                
+                val tokens = mutableListOf<String>()
+                var usersWithoutToken = 0
+                
+                for (document in documents) {
+                    val token = document.getString("fcmToken")
+                    val userId = document.id
+                    val email = document.getString("email") ?: "sin email"
+                    
+                    if (!token.isNullOrEmpty()) {
+                        tokens.add(token)
+                        Log.d("FirestoreUtil", "✓ Token encontrado para: $email")
+                    } else {
+                        usersWithoutToken++
+                        Log.w("FirestoreUtil", "✗ Usuario sin token FCM: $email (ID: $userId)")
+                    }
+                }
+                
+                Log.d("FirestoreUtil", "=== RESUMEN ===")
+                Log.d("FirestoreUtil", "Tokens FCM válidos: ${tokens.size}")
+                Log.d("FirestoreUtil", "Usuarios sin token: $usersWithoutToken")
+                Log.d("FirestoreUtil", "Total usuarios: ${documents.size()}")
+                
+                if (tokens.isNotEmpty()) {
+                    // Enviar notificación a cada usuario
+                    sendNotificationToTokens(tokens, event)
+                } else {
+                    Log.w("FirestoreUtil", "⚠️ No se encontraron tokens FCM. Los usuarios deben iniciar sesión para recibir notificaciones.")
+                }
+            }
+            .addOnFailureListener { e ->
+                Log.e("FirestoreUtil", "❌ Error al obtener usuarios para notificar", e)
+                e.printStackTrace()
+            }
+    }
+    
+    // Enviar notificación usando Cloud Functions o directamente con FCM Admin SDK
+    // Nota: Para producción, es mejor usar Cloud Functions
+    private fun sendNotificationToTokens(tokens: List<String>, event: Event) {
+        // Por ahora, usaremos una función helper que puede ser llamada desde Cloud Functions
+        // O podemos usar una solución más simple guardando una tarea en Firestore
+        // que será procesada por Cloud Functions
+        
+        Log.d("FirestoreUtil", "Preparando notificaciones para ${tokens.size} usuarios")
+        
+        // Crear un documento en una colección de notificaciones pendientes
+        // Cloud Functions puede escuchar esta colección y enviar las notificaciones
+        val notificationData = hashMapOf(
+            "eventId" to event.id,
+            "eventTitle" to event.title,
+            "eventDescription" to event.description,
+            "eventDate" to event.date,
+            "eventTime" to event.time,
+            "eventLocation" to event.location,
+            "tokens" to tokens,
+            "createdAt" to System.currentTimeMillis(),
+            "status" to "pending"
+        )
+        
+        db.collection("pending_notifications")
+            .add(notificationData)
+            .addOnSuccessListener { documentRef ->
+                Log.d("FirestoreUtil", "Notificación pendiente creada: ${documentRef.id}")
+            }
+            .addOnFailureListener { e ->
+                Log.e("FirestoreUtil", "Error al crear notificación pendiente", e)
+            }
     }
     
     // Actualizar evento
@@ -435,28 +539,72 @@ object FirestoreUtil {
     
     // Confirmar asistencia
     fun confirmAttendance(attendance: Attendance, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
+        Log.d("FirestoreUtil", "=== CONFIRMAR ASISTENCIA ===")
+        Log.d("FirestoreUtil", "Usuario ID: ${attendance.userId}")
+        Log.d("FirestoreUtil", "Evento ID: ${attendance.eventId}")
+        
         // Verificar si ya existe una asistencia para este usuario y evento
         attendancesCollection
             .whereEqualTo("userId", attendance.userId)
             .whereEqualTo("eventId", attendance.eventId)
             .get()
             .addOnSuccessListener { snapshot ->
+                Log.d("FirestoreUtil", "Query completada. Documentos encontrados: ${snapshot.size()}")
+                
                 if (snapshot.isEmpty) {
                     // No existe, crear nueva
                     val docRef = attendancesCollection.document()
-                    val attendanceWithId = attendance.copy(id = docRef.id, status = "CONFIRMED")
-                    docRef.set(attendanceWithId.toMap())
-                        .addOnSuccessListener { onSuccess() }
-                        .addOnFailureListener { onFailure(it) }
+                    val attendanceWithId = attendance.copy(id = docRef.id, status = "CONFIRMED", timestamp = System.currentTimeMillis())
+                    val attendanceMap = attendanceWithId.toMap()
+                    
+                    Log.d("FirestoreUtil", "Creando nueva asistencia con ID: ${attendanceWithId.id}")
+                    Log.d("FirestoreUtil", "Datos de asistencia: $attendanceMap")
+                    
+                    docRef.set(attendanceMap)
+                        .addOnSuccessListener { 
+                            Log.d("FirestoreUtil", "✓✓✓ Asistencia creada exitosamente en Firestore ✓✓✓")
+                            Log.d("FirestoreUtil", "Documento ID: ${docRef.id}")
+                            onSuccess() 
+                        }
+                        .addOnFailureListener { error ->
+                            Log.e("FirestoreUtil", "✗✗✗ Error al crear asistencia en Firestore ✗✗✗", error)
+                            Log.e("FirestoreUtil", "Tipo de error: ${error.javaClass.simpleName}")
+                            Log.e("FirestoreUtil", "Mensaje: ${error.message}")
+                            error.printStackTrace()
+                            onFailure(error)
+                        }
                 } else {
                     // Existe, actualizar
                     val doc = snapshot.documents[0]
-                    doc.reference.update("status", "CONFIRMED", "timestamp", System.currentTimeMillis())
-                        .addOnSuccessListener { onSuccess() }
-                        .addOnFailureListener { onFailure(it) }
+                    Log.d("FirestoreUtil", "Actualizando asistencia existente: ${doc.id}")
+                    Log.d("FirestoreUtil", "Estado actual: ${doc.getString("status")}")
+                    
+                    doc.reference.update(
+                        mapOf(
+                            "status" to "CONFIRMED",
+                            "timestamp" to System.currentTimeMillis()
+                        )
+                    )
+                        .addOnSuccessListener { 
+                            Log.d("FirestoreUtil", "✓✓✓ Asistencia actualizada exitosamente en Firestore ✓✓✓")
+                            onSuccess() 
+                        }
+                        .addOnFailureListener { error ->
+                            Log.e("FirestoreUtil", "✗✗✗ Error al actualizar asistencia en Firestore ✗✗✗", error)
+                            Log.e("FirestoreUtil", "Tipo de error: ${error.javaClass.simpleName}")
+                            Log.e("FirestoreUtil", "Mensaje: ${error.message}")
+                            error.printStackTrace()
+                            onFailure(error)
+                        }
                 }
             }
-            .addOnFailureListener { onFailure(it) }
+            .addOnFailureListener { error ->
+                Log.e("FirestoreUtil", "✗✗✗ Error al verificar asistencia existente ✗✗✗", error)
+                Log.e("FirestoreUtil", "Tipo de error: ${error.javaClass.simpleName}")
+                Log.e("FirestoreUtil", "Mensaje: ${error.message}")
+                error.printStackTrace()
+                onFailure(error)
+            }
     }
     
     // Cancelar asistencia
@@ -497,37 +645,63 @@ object FirestoreUtil {
     
     // Obtener número de asistentes confirmados
     fun getConfirmedAttendeesCount(eventId: String, onSuccess: (Int) -> Unit, onFailure: (Exception) -> Unit) {
+        Log.d("FirestoreUtil", "Obteniendo conteo de asistentes para evento: $eventId")
         attendancesCollection
             .whereEqualTo("eventId", eventId)
             .whereEqualTo("status", "CONFIRMED")
             .get()
             .addOnSuccessListener { snapshot ->
-                onSuccess(snapshot.size())
+                val count = snapshot.size()
+                Log.d("FirestoreUtil", "Conteo de asistentes confirmados: $count")
+                onSuccess(count)
             }
-            .addOnFailureListener { onFailure(it) }
+            .addOnFailureListener { error ->
+                Log.e("FirestoreUtil", "Error al obtener conteo de asistentes", error)
+                onFailure(error)
+            }
     }
     
     // Escuchar asistencias de un evento
     fun listenToEventAttendances(eventId: String, onAttendancesChanged: (List<Attendance>) -> Unit): ListenerRegistration {
+        Log.d("FirestoreUtil", "Configurando listener de asistencias para evento: $eventId")
+        
         return attendancesCollection
             .whereEqualTo("eventId", eventId)
             .whereEqualTo("status", "CONFIRMED")
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    Log.w("FirestoreUtil", "Listen to attendances failed.", error)
+                    Log.e("FirestoreUtil", "Error en listener de asistencias", error)
+                    error.printStackTrace()
                     return@addSnapshotListener
                 }
                 
-                val attendances = snapshot?.documents?.mapNotNull { doc ->
-                    Attendance(
-                        id = doc.id,
-                        userId = doc.getString("userId") ?: "",
-                        eventId = doc.getString("eventId") ?: "",
-                        status = doc.getString("status") ?: "",
-                        timestamp = doc.getLong("timestamp") ?: 0L
-                    )
-                } ?: emptyList()
+                if (snapshot == null) {
+                    Log.w("FirestoreUtil", "Snapshot es null en listener de asistencias")
+                    onAttendancesChanged(emptyList())
+                    return@addSnapshotListener
+                }
                 
+                val attendances = snapshot.documents.mapNotNull { doc ->
+                    try {
+                        val userId = doc.getString("userId") ?: ""
+                        val eventIdFromDoc = doc.getString("eventId") ?: ""
+                        val status = doc.getString("status") ?: ""
+                        val timestamp = doc.getLong("timestamp") ?: 0L
+                        
+                        Attendance(
+                            id = doc.id,
+                            userId = userId,
+                            eventId = eventIdFromDoc,
+                            status = status,
+                            timestamp = timestamp
+                        )
+                    } catch (e: Exception) {
+                        Log.e("FirestoreUtil", "Error al parsear documento de asistencia: ${doc.id}", e)
+                        null
+                    }
+                }
+                
+                Log.d("FirestoreUtil", "Listener de asistencias: ${attendances.size} asistencias confirmadas para evento $eventId")
                 onAttendancesChanged(attendances)
             }
     }

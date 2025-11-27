@@ -13,7 +13,7 @@ data class Event(
     val createdAt: Long = System.currentTimeMillis()
 ) {
     fun toMap(): Map<String, Any> {
-        return mapOf(
+        val map = mutableMapOf<String, Any>(
             "organizerId" to organizerId,
             "title" to title,
             "description" to description,
@@ -24,6 +24,11 @@ data class Event(
             "timestamp" to timestamp,
             "createdAt" to createdAt
         )
+        // Incluir el ID si no está vacío (útil para actualizaciones)
+        if (id.isNotEmpty()) {
+            map["id"] = id
+        }
+        return map
     }
 }
 

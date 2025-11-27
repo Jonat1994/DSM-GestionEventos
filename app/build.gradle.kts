@@ -66,6 +66,7 @@ dependencies {
     implementation("com.google.firebase:firebase-auth:22.1.0") // verifica versión
     implementation("com.google.android.gms:play-services-auth:20.5.0") // verifica versión
     implementation("com.google.firebase:firebase-storage:20.3.0")
+    implementation("com.google.firebase:firebase-messaging:23.3.1")
     
     // Facebook Login
     implementation("com.facebook.android:facebook-login:16.2.0")
@@ -77,6 +78,12 @@ dependencies {
     implementation(libs.androidx.cardview)
     implementation("androidx.recyclerview:recyclerview:1.3.2")
     implementation("com.google.android.material:material:1.11.0")
+    
+    // Autenticación biométrica
+    implementation("androidx.biometric:biometric:1.1.0")
+    
+    // Almacenamiento seguro
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
     // Librerías externas
     implementation(libs.mpandroidchart)
