@@ -8,6 +8,8 @@ import androidx.appcompat.app.AppCompatActivity
 import com.foro_2.databinding.ActivityProfileBinding
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.ListenerRegistration
+import com.bumptech.glide.Glide
+import android.util.Log
 
 class ProfileActivity : AppCompatActivity() {
     
@@ -34,7 +36,7 @@ class ProfileActivity : AppCompatActivity() {
     
     private fun setupUI() {
         binding.btnEditProfile.setOnClickListener {
-            Toast.makeText(this, "Edición de perfil próximamente", Toast.LENGTH_SHORT).show()
+            startActivity(Intent(this, SettingsActivity::class.java))
         }
         
         binding.btnLogout.setOnClickListener {
@@ -48,6 +50,66 @@ class ProfileActivity : AppCompatActivity() {
         binding.textViewName.text = user.displayName ?: user.email?.split("@")?.get(0) ?: "Usuario"
         binding.textViewEmail.text = user.email ?: ""
         
+        // Cargar información adicional desde Firestore
+        FirestoreUtil.getUserProfile(user.uid,
+            onSuccess = { profileData ->
+                profileData?.let { data ->
+                    // Cargar foto de perfil
+                    val photoUrl = data["photoUrl"] as? String
+                    if (!photoUrl.isNullOrEmpty()) {
+                        Glide.with(this)
+                            .load(photoUrl)
+                            .circleCrop()
+                            .placeholder(R.drawable.custom_splash_icon)
+                            .error(R.drawable.custom_splash_icon)
+                            .into(binding.imageViewProfile)
+                    } else if (user.photoUrl != null) {
+                        // Usar foto de Firebase Auth si no hay en Firestore
+                        Glide.with(this)
+                            .load(user.photoUrl)
+                            .circleCrop()
+                            .placeholder(R.drawable.custom_splash_icon)
+                            .error(R.drawable.custom_splash_icon)
+                            .into(binding.imageViewProfile)
+                    }
+                    
+                    // Cargar información adicional
+                    val displayName = data["displayName"] as? String
+                    if (!displayName.isNullOrEmpty() && displayName != binding.textViewName.text) {
+                        binding.textViewName.text = displayName
+                    }
+                    
+                    val phone = data["phone"] as? String
+                    if (!phone.isNullOrEmpty()) {
+                        binding.textViewPhone.text = "📱 $phone"
+                        binding.textViewPhone.visibility = android.view.View.VISIBLE
+                    } else {
+                        binding.textViewPhone.visibility = android.view.View.GONE
+                    }
+                    
+                    val bio = data["bio"] as? String
+                    if (!bio.isNullOrEmpty()) {
+                        binding.textViewBio.text = bio
+                        binding.textViewBio.visibility = android.view.View.VISIBLE
+                    } else {
+                        binding.textViewBio.visibility = android.view.View.GONE
+                    }
+                }
+            },
+            onFailure = { e ->
+                Log.e("ProfileActivity", "Error al cargar perfil", e)
+                // Intentar cargar foto de Firebase Auth
+                if (user.photoUrl != null) {
+                    Glide.with(this)
+                        .load(user.photoUrl)
+                        .circleCrop()
+                        .placeholder(R.drawable.custom_splash_icon)
+                        .error(R.drawable.custom_splash_icon)
+                        .into(binding.imageViewProfile)
+                }
+            }
+        )
+        
         // Cargar rol
         FirestoreUtil.getUserRole(user.uid,
             onSuccess = { role ->
@@ -60,12 +122,6 @@ class ProfileActivity : AppCompatActivity() {
                 binding.textViewAccountType.text = "Usuario"
             }
         )
-        
-        // Cargar foto si existe
-        if (user.photoUrl != null) {
-            // Usar Glide o similar para cargar imagen
-            // Por ahora placeholder
-        }
     }
     
     private fun loadStatistics() {

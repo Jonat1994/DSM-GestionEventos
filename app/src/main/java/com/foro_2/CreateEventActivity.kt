@@ -195,19 +195,34 @@ class CreateEventActivity : AppCompatActivity() {
         } else {
             // Verificar que el usuario sea organizador antes de crear
             if (currentRole != "organizador") {
+                Log.w("CreateEventActivity", "Usuario no es organizador. Rol actual: $currentRole")
                 Toast.makeText(this, "Solo los organizadores pueden crear eventos", Toast.LENGTH_SHORT).show()
                 return
             }
             
-            Log.d("CreateEventActivity", "Intentando crear evento: $title")
+            Log.d("CreateEventActivity", "=== INICIANDO CREACIÓN DE EVENTO ===")
+            Log.d("CreateEventActivity", "Usuario ID: ${user.uid}")
+            Log.d("CreateEventActivity", "Rol: $currentRole")
+            Log.d("CreateEventActivity", "Título: $title")
+            Log.d("CreateEventActivity", "Descripción: $description")
+            Log.d("CreateEventActivity", "Fecha: $date")
+            Log.d("CreateEventActivity", "Hora: $time")
+            Log.d("CreateEventActivity", "Ubicación: $location")
+            Log.d("CreateEventActivity", "Timestamp: ${event.timestamp}")
+            Log.d("CreateEventActivity", "CreatedAt: ${event.createdAt}")
+            
             FirestoreUtil.createEvent(event,
                 onSuccess = {
-                    Log.d("CreateEventActivity", "Evento creado exitosamente")
+                    Log.d("CreateEventActivity", "=== EVENTO CREADO EXITOSAMENTE ===")
                     Toast.makeText(this, "Evento creado exitosamente", Toast.LENGTH_SHORT).show()
                     finish()
                 },
                 onFailure = { error ->
-                    Log.e("CreateEventActivity", "Error al crear evento: ${error.message}", error)
+                    Log.e("CreateEventActivity", "=== ERROR AL CREAR EVENTO ===")
+                    Log.e("CreateEventActivity", "Tipo de error: ${error.javaClass.simpleName}")
+                    Log.e("CreateEventActivity", "Mensaje: ${error.message}")
+                    Log.e("CreateEventActivity", "Causa: ${error.cause?.message}")
+                    error.printStackTrace()
                     Toast.makeText(this, "Error al crear evento: ${error.message}", Toast.LENGTH_LONG).show()
                 }
             )
