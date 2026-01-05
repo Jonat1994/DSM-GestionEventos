@@ -4,6 +4,7 @@
     android:layout_height="match_parent"
     android:background="@color/black">
 
+<<<<<<< HEAD
     <!-- VideoView para reproducir el video a pantalla completa -->
     <VideoView
         android:id="@+id/videoView"
@@ -13,6 +14,9 @@
         android:visibility="gone" />
 
     <!-- Layout para mostrar el icono personalizado antes del video -->
+=======
+    <!-- Layout para mostrar el icono personalizado -->
+>>>>>>> 3e5ed33 (Descripción del commit)
     <LinearLayout
         android:id="@+id/iconLayout"
         android:layout_width="match_parent"

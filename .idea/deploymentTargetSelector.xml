@@ -13,9 +13,12 @@
         </DropdownSelection>
         <DialogSelection />
       </SelectionState>
+<<<<<<< HEAD
       <SelectionState runConfigName="GreetingPreview">
         <option name="selectionMode" value="DROPDOWN" />
       </SelectionState>
+=======
+>>>>>>> 3e5ed33 (Descripción del commit)
     </selectionStates>
   </component>
 </project>

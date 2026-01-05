@@ -1,6 +1,7 @@
 package com.foro_2
 
 import android.content.Intent
+<<<<<<< HEAD
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Bundle
@@ -10,13 +11,23 @@ import android.util.DisplayMetrics
 import android.view.View
 import android.view.WindowManager
 import android.widget.VideoView
+=======
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.view.View
+import android.view.WindowManager
+>>>>>>> 3e5ed33 (Descripción del commit)
 import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.auth.FirebaseAuth
 
 class SplashActivity : AppCompatActivity() {
     
+<<<<<<< HEAD
     private var videoView: VideoView? = null
     
+=======
+>>>>>>> 3e5ed33 (Descripción del commit)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
@@ -33,6 +44,7 @@ class SplashActivity : AppCompatActivity() {
         
         setContentView(R.layout.activity_splash)
         
+<<<<<<< HEAD
         videoView = findViewById(R.id.videoView)
         val iconLayout = findViewById<View>(R.id.iconLayout)
         
@@ -130,6 +142,12 @@ class SplashActivity : AppCompatActivity() {
                 }, 2000)
             }
         }, 1500) // Mostrar el icono durante 1.5 segundos antes del video
+=======
+        // Mostrar el icono durante 1.5 segundos y luego navegar
+        Handler(Looper.getMainLooper()).postDelayed({
+            navigateToNextScreen()
+        }, 1500)
+>>>>>>> 3e5ed33 (Descripción del commit)
     }
     
     private fun navigateToNextScreen() {
@@ -145,10 +163,13 @@ class SplashActivity : AppCompatActivity() {
         startActivity(intent)
         finish()
     }
+<<<<<<< HEAD
     
     override fun onDestroy() {
         super.onDestroy()
         videoView?.stopPlayback()
         videoView = null
     }
+=======
+>>>>>>> 3e5ed33 (Descripción del commit)
 }
