@@ -43,7 +43,7 @@
 =======
         <!-- Logo Event.ly -->
 
-        <!-- Card contenedores para el formulario -->
+        <!-- Card contenedor para el formulario -->
 
         <ImageView
             android:id="@+id/logoIconImageView"
