@@ -16,31 +16,32 @@ import com.google.firebase.firestore.ListenerRegistration
 import java.util.Calendar
 
 class StatisticsActivity : AppCompatActivity() {
-    
+
     private lateinit var binding: ActivityStatisticsBinding
     private lateinit var firebaseAuth: FirebaseAuth
     private var eventsListener: ListenerRegistration? = null
     private var attendancesListener: ListenerRegistration? = null
     private var currentRole: String = "usuario"
-    
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         binding = ActivityStatisticsBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        
+
         // Configurar barras del sistema después de setContentView
         SystemUIHelper.setupSystemBars(this)
-        
+
         firebaseAuth = FirebaseAuth.getInstance()
-        
+
         loadUserRole()
     }
-    
+
     private fun loadUserRole() {
         val user = firebaseAuth.currentUser ?: return
-        
-        FirestoreUtil.getUserRole(user.uid,
+
+        FirestoreUtil.getUserRole(
+            user.uid,
             onSuccess = { role ->
                 currentRole = role ?: "usuario"
                 loadStatistics()
@@ -51,10 +52,10 @@ class StatisticsActivity : AppCompatActivity() {
             }
         )
     }
-    
+
     private fun loadStatistics() {
         val user = firebaseAuth.currentUser ?: return
-        
+
         if (currentRole == "organizador") {
             // Estadísticas del organizador
             eventsListener = FirestoreUtil.listenToOrganizerEvents(user.uid) { events ->
@@ -63,7 +64,8 @@ class StatisticsActivity : AppCompatActivity() {
             }
         } else {
             // Estadísticas del usuario
-            FirestoreUtil.getUserAttendedEvents(user.uid,
+            FirestoreUtil.getUserAttendedEvents(
+                user.uid,
                 onSuccess = { eventIds ->
                     loadUserStats(eventIds)
                 },
@@ -73,27 +75,28 @@ class StatisticsActivity : AppCompatActivity() {
             )
         }
     }
-    
+
     private fun loadUserStats(eventIds: List<String>) {
         // Cargar todos los eventos para obtener fechas
         eventsListener = FirestoreUtil.listenToAllEvents { allEvents ->
             val attendedEvents = allEvents.filter { eventIds.contains(it.id) }
-            val notAttendedEvents = allEvents.filter { !eventIds.contains(it.id) && it.timestamp < System.currentTimeMillis() }
-            
+            val notAttendedEvents =
+                allEvents.filter { !eventIds.contains(it.id) && it.timestamp < System.currentTimeMillis() }
+
             binding.textViewTotalAttended.text = "Eventos asistidos: ${attendedEvents.size}"
-            
+
             // Gráfica circular
             val pieEntries = listOf(
                 PieEntry(attendedEvents.size.toFloat(), "Asistí"),
                 PieEntry(notAttendedEvents.size.toFloat(), "No asistí")
             )
-            
+
             val pieDataSet = PieDataSet(pieEntries, "").apply {
                 colors = listOf(Color.parseColor("#4CAF50"), Color.parseColor("#E53935"))
                 valueTextSize = 14f
                 valueTextColor = Color.WHITE
             }
-            
+
             binding.pieChart.apply {
                 data = PieData(pieDataSet)
                 description.isEnabled = false
@@ -102,22 +105,22 @@ class StatisticsActivity : AppCompatActivity() {
                 animateY(1000)
                 invalidate()
             }
-            
+
             // Gráfica de barras por mes
             val eventsByMonth = attendedEvents.groupBy {
                 val calendar = Calendar.getInstance().apply { timeInMillis = it.timestamp }
                 calendar.get(Calendar.MONTH)
             }
-            
+
             val barEntries = (0..11).map { month ->
                 BarEntry(month.toFloat(), eventsByMonth[month]?.size?.toFloat() ?: 0f)
             }
-            
+
             val barDataSet = BarDataSet(barEntries, "Eventos por mes").apply {
                 color = Color.parseColor("#2D6CDF")
                 valueTextSize = 12f
             }
-            
+
             binding.barChart.apply {
                 data = BarData(barDataSet)
                 description.isEnabled = false
@@ -126,28 +129,28 @@ class StatisticsActivity : AppCompatActivity() {
             }
         }
     }
-    
+
     private fun loadOrganizerStats(events: List<Event>) {
         // Para organizadores, mostrar estadísticas de sus eventos
         val totalAttendances = events.size // Simplificado
-        
+
         binding.textViewTotalAttended.text = "Total de eventos: ${events.size}"
-        
+
         // Gráfica de barras por mes
         val eventsByMonth = events.groupBy {
             val calendar = Calendar.getInstance().apply { timeInMillis = it.timestamp }
             calendar.get(Calendar.MONTH)
         }
-        
+
         val barEntries = (0..11).map { month ->
             BarEntry(month.toFloat(), eventsByMonth[month]?.size?.toFloat() ?: 0f)
         }
-        
+
         val barDataSet = BarDataSet(barEntries, "Eventos creados por mes").apply {
             color = Color.parseColor("#2D6CDF")
             valueTextSize = 12f
         }
-        
+
         binding.barChart.apply {
             data = BarData(barDataSet)
             description.isEnabled = false
@@ -155,7 +158,7 @@ class StatisticsActivity : AppCompatActivity() {
             invalidate()
         }
     }
-    
+
     override fun onPause() {
         super.onPause()
         eventsListener?.remove()
