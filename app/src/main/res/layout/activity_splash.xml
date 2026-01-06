@@ -13,6 +13,9 @@
         android:visibility="gone" />
 
     <!-- Layout para mostrar el icono personalizado antes del video -->
+
+    <!-- Layout para mostrar el icono personalizado -->
+
     <LinearLayout
         android:id="@+id/iconLayout"
         android:layout_width="match_parent"

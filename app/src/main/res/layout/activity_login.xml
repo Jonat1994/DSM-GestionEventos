@@ -10,43 +10,30 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:gravity="center"
         android:orientation="vertical"
-        android:padding="24dp"
-        android:gravity="center">
+        android:padding="24dp">
 
-        <!-- Logo o título con más estilo -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="64dp"
-            android:text="Iniciar Sesión"
-            android:textColor="@color/white"
-            android:textSize="32sp"
-            android:textStyle="bold"
-            android:fontFamily="sans-serif-medium"
-            android:shadowColor="@color/dark_gray"
-            android:shadowDx="2"
-            android:shadowDy="2"
-            android:shadowRadius="4" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="Bienvenido de nuevo"
-            android:textColor="@color/white"
-            android:textSize="16sp"
-            android:alpha="0.9" />
+        <!-- Logo Event.ly -->
 
         <!-- Card contenedor para el formulario -->
-        <androidx.cardview.widget.CardView
-            xmlns:app="http://schemas.android.com/apk/res-auto"
+
+        <ImageView
+            android:id="@+id/logoIconImageView"
+            android:layout_width="165dp"
+            android:layout_height="79dp"
+            android:layout_marginTop="64dp"
+            android:contentDescription="Logo Event.ly"
+            android:scaleType="fitCenter"
+            android:src="@drawable/logo_evently" />
+
+        <androidx.cardview.widget.CardView xmlns:app="http://schemas.android.com/apk/res-auto"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="32dp"
+            app:cardBackgroundColor="@color/white"
             app:cardCornerRadius="20dp"
-            app:cardElevation="8dp"
-            app:cardBackgroundColor="@color/white">
+            app:cardElevation="8dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -58,16 +45,16 @@
                     android:id="@+id/emailEditText"
                     android:layout_width="match_parent"
                     android:layout_height="56dp"
+                    android:background="@drawable/rounded_edittext"
+                    android:drawableStart="@android:drawable/ic_dialog_email"
+                    android:drawablePadding="12dp"
                     android:hint="Correo electrónico"
                     android:inputType="textEmailAddress"
                     android:paddingStart="16dp"
                     android:paddingEnd="16dp"
-                    android:background="@drawable/rounded_edittext"
                     android:textColor="@color/dark_gray"
                     android:textColorHint="@color/dark_gray"
-                    android:textSize="16sp"
-                    android:drawableStart="@android:drawable/ic_dialog_email"
-                    android:drawablePadding="12dp" />
+                    android:textSize="16sp" />
 
                 <!-- Campo de contraseña con icono de ojo -->
                 <RelativeLayout
@@ -79,16 +66,16 @@
                         android:id="@+id/passwordEditText"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
+                        android:background="@drawable/rounded_edittext"
+                        android:drawableStart="@android:drawable/ic_lock_lock"
+                        android:drawablePadding="12dp"
                         android:hint="Contraseña"
                         android:inputType="textPassword"
                         android:paddingStart="16dp"
                         android:paddingEnd="56dp"
-                        android:background="@drawable/rounded_edittext"
                         android:textColor="@color/dark_gray"
                         android:textColorHint="@color/dark_gray"
-                        android:textSize="16sp"
-                        android:drawableStart="@android:drawable/ic_lock_lock"
-                        android:drawablePadding="12dp" />
+                        android:textSize="16sp" />
 
                     <ImageButton
                         android:id="@+id/btnTogglePassword"
@@ -98,10 +85,10 @@
                         android:layout_centerVertical="true"
                         android:layout_marginEnd="4dp"
                         android:background="?android:attr/selectableItemBackgroundBorderless"
-                        android:src="@drawable/ic_visibility_off"
                         android:contentDescription="Mostrar/Ocultar contraseña"
+                        android:padding="12dp"
                         android:scaleType="fitCenter"
-                        android:padding="12dp" />
+                        android:src="@drawable/ic_visibility_off" />
                 </RelativeLayout>
 
                 <TextView
@@ -121,11 +108,11 @@
                     android:layout_height="56dp"
                     android:layout_marginTop="24dp"
                     android:background="@drawable/rounded_button"
+                    android:elevation="4dp"
                     android:text="Iniciar sesión"
                     android:textColor="@color/white"
                     android:textSize="16sp"
-                    android:textStyle="bold"
-                    android:elevation="4dp" />
+                    android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/notUserYet"
@@ -144,8 +131,8 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="24dp"
                     android:layout_marginBottom="16dp"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
                     <View
                         android:layout_width="0dp"
@@ -173,9 +160,9 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
+                    android:layout_marginBottom="8dp"
                     android:gravity="center"
-                    android:layout_marginBottom="8dp">
+                    android:orientation="horizontal">
 
                     <ImageButton
                         android:id="@+id/googleSignInButton"
@@ -183,10 +170,10 @@
                         android:layout_height="64dp"
                         android:layout_marginEnd="16dp"
                         android:background="@drawable/rounded_social_button"
-                        android:src="@drawable/ic_google_logo"
                         android:contentDescription="Iniciar sesión con Google"
+                        android:padding="16dp"
                         android:scaleType="fitCenter"
-                        android:padding="16dp" />
+                        android:src="@drawable/ic_google_logo" />
 
                     <ImageButton
                         android:id="@+id/facebookSignInButton"
@@ -194,10 +181,10 @@
                         android:layout_height="64dp"
                         android:layout_marginStart="16dp"
                         android:background="@drawable/rounded_social_button"
-                        android:src="@drawable/ic_facebook_logo"
                         android:contentDescription="Iniciar sesión con Facebook"
+                        android:padding="16dp"
                         android:scaleType="fitCenter"
-                        android:padding="16dp" />
+                        android:src="@drawable/ic_facebook_logo" />
                 </LinearLayout>
             </LinearLayout>
         </androidx.cardview.widget.CardView>
@@ -208,10 +195,10 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="32dp"
             android:layout_marginBottom="24dp"
+            android:alpha="0.8"
             android:text="Fue desarrollado por Jonathan Flamenco"
             android:textColor="@color/white"
             android:textSize="12sp"
-            android:alpha="0.8"
             android:textStyle="italic" />
 
     </LinearLayout>
